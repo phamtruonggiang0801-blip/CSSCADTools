@@ -71,19 +71,34 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,5,0,0">
         <StackPanel TextElement.FontWeight="Normal" Margin="4">
-            
-            <GroupBox Header="3D EXTRACTION (STEP 1)">
-                <StackPanel>
-                    <TextBlock Text="Extract Model Geometry and Properties from Inventor IDW files into JSON/DWG." Style="{StaticResource HelperTextStyle}"/>
-                    <Button x:Name="BtnBatchImportInventor" Content="Import .idw files" Click="BtnBatchImportInventor_Click"/>
-                </StackPanel>
-            </GroupBox>
 
-            <GroupBox Header="BLOCK FITTING (STEP 2)">
-                <StackPanel>
+            <!-- ADMIN — Expander dong/mo, vien only, 2 nut import mau xanh -->
+            <Expander x:Name="AdminExpander" IsExpanded="False" Margin="5,0,5,10">
+                <Expander.Header>
+                    <TextBlock Text="ADMIN — IMPORT TOOLS" FontWeight="SemiBold" FontSize="11" Foreground="#FF005E9E"/>
+                </Expander.Header>
+                <Expander.Style>
+                    <Style TargetType="Expander">
+                        <Setter Property="BorderBrush" Value="#FF005E9E"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Padding" Value="8,6,8,8"/>
+                    </Style>
+                </Expander.Style>
+                <StackPanel Margin="0,6,0,0">
+                    <!-- Step 1: IDW Import -->
+                    <TextBlock Text="Step 1 — Extract from Inventor IDW" FontWeight="SemiBold" Foreground="#FF444444" Margin="0,0,0,4"/>
+                    <TextBlock Text="Extract Model Geometry and Properties from Inventor IDW files into JSON/DWG." Style="{StaticResource HelperTextStyle}"/>
+                    <Button x:Name="BtnBatchImportInventor" Content="Import .idw files" Style="{StaticResource PrimaryButtonStyle}" Click="BtnBatchImportInventor_Click"/>
+
+                    <!-- Separator -->
+                    <Separator Margin="0,8,0,8" Background="#FFDDDDDD"/>
+
+                    <!-- Step 2: JSON Import -->
+                    <TextBlock Text="Step 2 — Import JSON to AutoCAD" FontWeight="SemiBold" Foreground="#FF444444" Margin="0,0,0,4"/>
                     <TextBlock Text="Import the extracted JSON files, split views, map layers, and inject attributes." Style="{StaticResource HelperTextStyle}"/>
-                    
-                    <Border Background="#FFF8F8F8" BorderBrush="#FFDDDDDD" BorderThickness="1" Padding="6" Margin="0,0,0,8" CornerRadius="2">
+
+                    <Border Background="Transparent" BorderBrush="#FFDDDDDD" BorderThickness="1" Padding="6" Margin="0,0,0,8" CornerRadius="2">
                         <StackPanel>
                             <TextBlock Text="Target BOM Type:" FontWeight="SemiBold" Margin="0,0,0,6" Foreground="#FF444444"/>
                             <StackPanel Orientation="Horizontal">
@@ -92,10 +107,10 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
-                    
-                    <Button x:Name="BtnImportJson" Content="Import .json files" Click="BtnImportJson_Click"/>
+
+                    <Button x:Name="BtnImportJson" Content="Import .json files" Style="{StaticResource PrimaryButtonStyle}" Click="BtnImportJson_Click"/>
                 </StackPanel>
-            </GroupBox>
+            </Expander>
 
             <GroupBox Header="FITTING LIBRARY (STEP 3)">
                 <StackPanel>
