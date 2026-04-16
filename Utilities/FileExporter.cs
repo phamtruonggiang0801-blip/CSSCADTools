@@ -29,7 +29,46 @@ namespace CSSCADTools.Utilities
                 }
             }
 
-            // File 2: SECTION MARK CHECK
+            // File 2: REVERSE CHECK — Detail Sheet → có được tham chiếu không?
+            string reversePath = Path.Combine(dir, name + "_REVERSE.csv");
+            using (StreamWriter sw = new StreamWriter(reversePath, false, new System.Text.UTF8Encoding(true)))
+            {
+                sw.WriteLine("Detail ID,Defined In File,Referenced By,Source Type,Status");
+
+                // Tạo lookup nhanh: detailId → list of (sourceFile, sourceType)
+                var refLookup = new Dictionary<string, List<(string File, string Type)>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var src in scan.SourceDetails)
+                {
+                    if (!refLookup.ContainsKey(src.DetailId))
+                        refLookup[src.DetailId] = new List<(string, string)>();
+                    // Tránh trùng lặp cùng file
+                    bool exists = false;
+                    foreach (var r in refLookup[src.DetailId])
+                        if (string.Equals(r.File, src.SourceFile, StringComparison.OrdinalIgnoreCase)) { exists = true; break; }
+                    if (!exists)
+                        refLookup[src.DetailId].Add((src.SourceFile, src.SourceType));
+                }
+
+                foreach (var kvp in scan.DetailDefinitions)
+                {
+                    string detailId = kvp.Key;
+                    string definedIn = kvp.Value;
+
+                    if (refLookup.TryGetValue(detailId, out var refs))
+                    {
+                        foreach (var r in refs)
+                        {
+                            sw.WriteLine($"DET.{detailId},{definedIn},{r.File},{r.Type},OK");
+                        }
+                    }
+                    else
+                    {
+                        sw.WriteLine($"DET.{detailId},{definedIn},---,---,UNREFERENCED");
+                    }
+                }
+            }
+
+            // File 3: SECTION MARK CHECK
             string sectionPath = Path.Combine(dir, name + "_SECTION.csv");
             using (StreamWriter sw = new StreamWriter(sectionPath, false, new System.Text.UTF8Encoding(true)))
             {

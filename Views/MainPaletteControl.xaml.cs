@@ -69,8 +69,9 @@ namespace CSSCADTools.Views
                 MessageBox.Show(
                     $"Hoàn tất!\n\n" +
                     $"1. {baseName}_DETAIL.csv\n" +
-                    $"2. {baseName}_SECTION.csv\n" +
-                    $"3. {baseName}_DATALOG.csv",
+                    $"2. {baseName}_REVERSE.csv\n" +
+                    $"3. {baseName}_SECTION.csv\n" +
+                    $"4. {baseName}_DATALOG.csv",
                     "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
