@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>CSSCADTools - Huong dan su dung</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; line-height: 1.7; color: #e0e0e0; background: #1e1e1e; }
+        .container { max-width: 860px; margin: auto; padding: 30px 24px; }
+
+        h1 { color: #007ACC; font-size: 24px; margin-bottom: 6px; }
+        .subtitle { color: #888; font-size: 13px; margin-bottom: 30px; }
+        h2 { color: #007ACC; font-size: 17px; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #333; }
+        h3 { color: #ccc; font-size: 14px; margin: 16px 0 8px; }
+        p, li { font-size: 14px; }
+        ul, ol { margin-left: 20px; margin-bottom: 12px; }
+        li { margin-bottom: 4px; }
+
+        .code { background: #2d2d2d; color: #d4d4d4; padding: 2px 7px; border-radius: 3px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 13px; border: 1px solid #3a3a3a; }
+        .tag-ok { background: #1a3a1a; color: #4ec94e; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+        .tag-missing { background: #3a1a1a; color: #e05050; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+
+        .card { background: #252526; border: 1px solid #333; border-radius: 6px; padding: 16px 18px; margin: 12px 0; }
+        .card-title { color: #007ACC; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+        .step { display: flex; gap: 12px; margin-bottom: 10px; }
+        .step-num { background: #007ACC; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; flex-shrink: 0; margin-top: 2px; }
+        .step-text { flex: 1; }
+
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+        th { background: #2d2d2d; color: #007ACC; text-align: left; padding: 8px 12px; border: 1px solid #3a3a3a; }
+        td { padding: 8px 12px; border: 1px solid #3a3a3a; }
+        tr:nth-child(even) { background: #252526; }
+
+        .faq-item { margin-bottom: 14px; }
+        .faq-q { color: #ddd; font-weight: bold; margin-bottom: 4px; }
+        .faq-a { color: #aaa; padding-left: 16px; border-left: 2px solid #007ACC; }
+
+        .flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0; font-size: 13px; }
+        .flow-box { background: #2d2d2d; border: 1px solid #3a3a3a; padding: 6px 12px; border-radius: 4px; }
+        .flow-arrow { color: #007ACC; font-weight: bold; }
+
+        .warn { background: #3a2a0a; border-left: 3px solid #e0a020; padding: 10px 14px; border-radius: 0 4px 4px 0; margin: 10px 0; font-size: 13px; color: #e0c070; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>CSSCADTools</h1>
+    <div class="subtitle">Plugin AutoCAD .NET - Kiem tra Detail Cross-Reference &amp; CAD Utilities</div>
+
+    <!-- ================================================ -->
+    <h2>1. Cai dat</h2>
+    <!-- ================================================ -->
+
+    <div class="card">
+        <div class="card-title">Yeu cau he thong</div>
+        <ul>
+            <li>AutoCAD 2024 tro len (hỗ tro .NET Framework 4.8)</li>
+            <li>Windows 10/11, 64-bit</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Mo AutoCAD, go lenh <span class="code">NETLOAD</span></div>
+    </div>
+    <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Chon file <span class="code">CSSCADTools_xxxxxxxx_xxxx.dll</span> trong thu muc <span class="code">C:\CustomTools</span></div>
+    </div>
+    <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Go lenh <span class="code">CSSTools</span> de mo bang dieu khien</div>
+    </div>
+
+    <div class="warn">
+        Ten file DLL co chua timestamp (VD: CSSCADTools_20260413_1500.dll). Moi lan build se tao file moi. Hay chon dung file moi nhat.
+    </div>
+
+    <!-- ================================================ -->
+    <h2>2. Tong quan cac chuc nang</h2>
+    <!-- ================================================ -->
+
+    <table>
+        <tr>
+            <th>Nhom</th>
+            <th>Nut bam</th>
+            <th>Mo ta</th>
+        </tr>
+        <tr>
+            <td>Detail Management</td>
+            <td><span class="code">CHECK DETAILS</span></td>
+            <td>Quet thu muc DWG, doi chieu Detail giua Top Plate va Detail Sheet, xuat bao cao CSV</td>
+        </tr>
+        <tr>
+            <td>Geometry Utilities</td>
+            <td><span class="code">TOTAL LINE LENGTH</span></td>
+            <td>Chon cac Line trong ban ve, tinh tong chieu dai</td>
+        </tr>
+        <tr>
+            <td>Geometry Utilities</td>
+            <td><span class="code">CALC AVERAGE MIDPOINT</span></td>
+            <td>Chon cac doi tuong, tinh diem trung binh (midpoint)</td>
+        </tr>
+        <tr>
+            <td>Block Utilities</td>
+            <td><span class="code">RANDOM RENAME BLOCK</span></td>
+            <td>Chon mot Block va doi ten ngau nhien</td>
+        </tr>
+    </table>
+
+    <!-- ================================================ -->
+    <h2>3. Huong dan chi tiet: CHECK DETAILS</h2>
+    <!-- ================================================ -->
+
+    <h3>3.1. Luong xu ly</h3>
+    <div class="flow">
+        <span class="flow-box">Chon thu muc DWG</span>
+        <span class="flow-arrow">&#8594;</span>
+        <span class="flow-box">Chon noi luu CSV</span>
+        <span class="flow-arrow">&#8594;</span>
+        <span class="flow-box">Quet toan bo file .dwg</span>
+        <span class="flow-arrow">&#8594;</span>
+        <span class="flow-box">Phan loai Top Plate / Details</span>
+        <span class="flow-arrow">&#8594;</span>
+        <span class="flow-box">Doi chieu &amp; xuat bao cao</span>
+    </div>
+
+    <h3>3.2. Cach chon thu muc</h3>
+    <p>Tool su dung hop thoai kieu <b>Windows Explorer</b> (co thanh dia chi, search, favorites). Chi can navigate toi thu muc chua cac file DWG va bam <b>Select Folder</b>.</p>
+
+    <h3>3.3. Cach phan loai file</h3>
+    <div class="card">
+        <div class="card-title">Logic phan loai</div>
+        <p>Tool tim Block <span class="code">_MCG_TITLE_NEW</span> trong Model Space. Neu bat ky Attribute nao chua chu <b>"TOP PLATE"</b> thi file do duoc xep vao nhom <b>Top Plate</b>. Tat ca file con lai la <b>Detail Sheet</b>.</p>
+    </div>
+
+    <h3>3.4. Cach boc tach Detail ID</h3>
+    <p>Tool doc toan bo <b>DBText</b> va <b>MText</b> trong Model Space, sau do:</p>
+    <ol>
+        <li>Don sach cac ma dinh dang MText (<span class="code">\fArial|b1;</span>, <span class="code">\C1;</span>, <span class="code">\H2.5;</span>...)</li>
+        <li>Ep phang xuong dong <span class="code">\P</span> thanh dau cach (de ghep cac manh text bi phan ra boi Enter)</li>
+        <li>Tach text theo tu khoa <span class="code">DETAIL</span> hoac <span class="code">DET</span></li>
+        <li>Ghep cac manh chu ngan (S, A) va so (71) thanh ID hoan chinh (VD: <b>SA71</b>)</li>
+        <li>Dung ghep khi gap <b>stop-word</b>: SCALE, TYP, MIRROR, IMAGE, PLATE, TOP, BOTTOM, THK, DWG, REF, SIM, OF, FOR, POSITION, PANEL, SIDE, BETWEEN</li>
+    </ol>
+
+    <div class="card">
+        <div class="card-title">Vi du boc tach</div>
+        <table>
+            <tr><th>Text goc trong DWG</th><th>Ket qua</th></tr>
+            <tr><td><span class="code">DET.SA71 OF 10A PANEL</span></td><td><b>SA71</b></td></tr>
+            <tr><td><span class="code">SEE DETAIL 1A, 2B &amp; 3C</span></td><td><b>1A</b>, <b>2B</b>, <b>3C</b></td></tr>
+            <tr><td><span class="code">DET.SF71 MIRROR IMAGE</span></td><td><b>SF71</b></td></tr>
+            <tr><td><span class="code">DETAIL SM61 FOR TOP PLATE</span></td><td><b>SM61</b></td></tr>
+        </table>
+    </div>
+
+    <h3>3.5. File bao cao CSV</h3>
+    <table>
+        <tr>
+            <th>Detail ID</th>
+            <th>Top Plate File</th>
+            <th>Details File</th>
+            <th>Status</th>
+        </tr>
+        <tr>
+            <td>DET.SA71</td>
+            <td>TP-001.dwg</td>
+            <td>DET-SA.dwg</td>
+            <td><span class="tag-ok">OK</span></td>
+        </tr>
+        <tr>
+            <td>DET.SF71</td>
+            <td>TP-001.dwg</td>
+            <td>---</td>
+            <td><span class="tag-missing">MISSING</span></td>
+        </tr>
+    </table>
+    <p><span class="tag-ok">OK</span> = Detail duoc tim thay trong ca Top Plate va Detail Sheet.<br>
+       <span class="tag-missing">MISSING</span> = Detail chi co trong Top Plate nhung khong tim thay o bat ky Detail Sheet nao.</p>
+
+    <!-- ================================================ -->
+    <h2>4. Cau truc Project</h2>
+    <!-- ================================================ -->
+
+    <div class="card">
+        <table>
+            <tr><th>File</th><th>Vai tro</th></tr>
+            <tr><td><span class="code">Commands/MainCommands.cs</span></td><td>Dang ky lenh <span class="code">CSSTools</span>, tao PaletteSet</td></tr>
+            <tr><td><span class="code">Views/MainPaletteControl.xaml</span></td><td>Giao dien WPF (4 nut bam, thanh trang thai)</td></tr>
+            <tr><td><span class="code">Views/MainPaletteControl.xaml.cs</span></td><td>Xu ly su kien click, goi cac module utility</td></tr>
+            <tr><td><span class="code">Models/DetailModels.cs</span></td><td>Data model: DetailInfo (ID, Source, Target, Status)</td></tr>
+            <tr><td><span class="code">Utilities/TextParser.cs</span></td><td>Co may boc tach Detail ID tu chuoi MText/DBText</td></tr>
+            <tr><td><span class="code">Utilities/DwgDatabase.cs</span></td><td>Quet side-database DWG, phan loai Top Plate / Details</td></tr>
+            <tr><td><span class="code">Utilities/FileExporter.cs</span></td><td>Xuat bao cao CSV (UTF-8 + BOM)</td></tr>
+            <tr><td><span class="code">Utilities/FolderPicker.cs</span></td><td>Hop thoai chon thu muc kieu Windows Explorer (COM IFileOpenDialog)</td></tr>
+        </table>
+    </div>
+
+    <!-- ================================================ -->
+    <h2>5. FAQ - Cau hoi thuong gap</h2>
+    <!-- ================================================ -->
+
+    <div class="faq-item">
+        <div class="faq-q">Q: Detail co trong ban ve nhung tool bao MISSING?</div>
+        <div class="faq-a">
+            Kiem tra cac truong hop sau:
+            <ul>
+                <li><b>Text nam trong Block Reference</b> - Tool hien chi doc DBText/MText truc tiep trong Model Space. Neu text nam trong mot Block (VD: detail bubble, callout symbol), se khong duoc quet.</li>
+                <li><b>Text dung "DETAIL" nhung bi split sai</b> - Da fix bang cach dat "DETAIL" truoc "DET" trong mang separator de C# uu tien match tu dai hon.</li>
+                <li><b>MText bi phan manh boi \P</b> - Da fix bang cach ep phang \P thanh dau cach truoc khi parse, nen "DET.S\PA\P12" se ghep thanh "SA12".</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">Q: File Details bi nham thanh Top Plate?</div>
+        <div class="faq-a">Neu Attribute trong title block chua chu "TOP PLATE" (VD: "TOP PLATE DETAILS"), file se bi phan loai nham. Kiem tra lai noi dung Attribute cua Block <span class="code">_MCG_TITLE_NEW</span>.</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">Q: File CSV mo trong Excel bi loi font?</div>
+        <div class="faq-a">File duoc xuat voi dinh dang UTF-8 + BOM. Neu van bi loi, mo Excel > Data > From Text/CSV > chon UTF-8.</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">Q: Tool bao loi khi quet thu muc?</div>
+        <div class="faq-a">Mot so file DWG co the dang bi khoa boi tien trinh khac (AutoCAD, BIM360...). Tool se tu dong bo qua cac file loi va tiep tuc quet cac file con lai.</div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-q">Q: Lenh CSSTools khong hoat dong?</div>
+        <div class="faq-a">Dam bao da NETLOAD dung file DLL moi nhat. Ten file co chua timestamp (VD: <span class="code">CSSCADTools_20260413_1500.dll</span>). Kiem tra Output window cua AutoCAD de xem thong bao loi.</div>
+    </div>
+
+</div>
+</body>
+</html>

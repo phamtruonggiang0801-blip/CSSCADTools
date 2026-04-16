@@ -1,0 +1,75 @@
+<UserControl x:Class="CSSCADTools.Views.MainPaletteControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#2D2D2D"> <UserControl.Resources>
+        <Style x:Key="StandardButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Background" Value="#444444"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#666666"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#555555"/>
+                    <Setter Property="BorderBrush" Value="#007ACC"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="12">
+            <TextBlock Text="CSS CAD TOOLS" 
+                       Foreground="#007ACC" 
+                       FontWeight="Bold" 
+                       FontSize="15" 
+                       Margin="0,0,0,15"/>
+
+            <TextBlock Text="DETAIL MANAGEMENT" Foreground="#888888" FontSize="10" FontWeight="Bold" Margin="0,5,0,5"/>
+            <Button x:Name="BtnCheckDetails" 
+                    Content="CHECK DETAILS" 
+                    Style="{StaticResource StandardButtonStyle}"
+                    Click="BtnCheckDetails_Click"/>
+
+            <TextBlock Text="GEOMETRY UTILITIES" Foreground="#888888" FontSize="10" FontWeight="Bold" Margin="0,15,0,5"/>
+            <Button x:Name="BtnTotalLength" 
+                    Content="TOTAL LINE LENGTH" 
+                    Style="{StaticResource StandardButtonStyle}"
+                    Click="BtnTotalLength_Click"/>
+            
+            <Button x:Name="BtnAverageMidpoint" 
+                    Content="CALC AVERAGE MIDPOINT" 
+                    Style="{StaticResource StandardButtonStyle}"
+                    Click="BtnAverageMidpoint_Click"/>
+
+            <TextBlock Text="BLOCK UTILITIES" Foreground="#888888" FontSize="10" FontWeight="Bold" Margin="0,15,0,5"/>
+            <Button x:Name="BtnRandomRename" 
+                    Content="RANDOM RENAME BLOCK" 
+                    Style="{StaticResource StandardButtonStyle}"
+                    Click="BtnRandomRename_Click"/>
+
+            <Separator Background="#444444" Margin="0,15,0,10"/>
+            <TextBlock x:Name="TxtStatus" 
+                       Text="Status: Ready" 
+                       Foreground="#AAAAAA" 
+                       FontSize="11" 
+                       FontStyle="Italic"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
