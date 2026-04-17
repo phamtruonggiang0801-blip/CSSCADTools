@@ -8,16 +8,18 @@ namespace CSSCADTools.Utilities
 {
     public static class SectionScanner
     {
-        private static readonly string[] SectionBlockNames = {
+        // Keyword nhận dạng Section Mark block (dùng Contains, không cần khớp chính xác).
+        // Tiền tố/hậu tố tùy ý. VD: "MCG_SECTION_MARK_VERT", "SECTION_MARK_V2" đều match.
+        private static readonly string[] SectionBlockKeywords = {
             "SECTION_MARK_VERT",
             "SECTION_MARK"
         };
 
         public static bool IsSectionMarkBlock(string blockName)
         {
-            foreach (string name in SectionBlockNames)
+            foreach (string keyword in SectionBlockKeywords)
             {
-                if (blockName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                if (blockName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
                     return true;
             }
             return false;
