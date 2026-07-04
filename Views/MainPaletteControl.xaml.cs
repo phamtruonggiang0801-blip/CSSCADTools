@@ -140,6 +140,69 @@ namespace CSSCADTools.Views
         }
 
         /// <summary>
+        /// Chức năng 5: Xuất toàn bộ BOM (block SW_TABLEANNOTATION_1) từ các file DXF ra 1 file Excel
+        /// </summary>
+        private async void BtnExportBom_Click(object sender, RoutedEventArgs e)
+        {
+            // 1. Chọn thư mục chứa các file DXF cần xuất BOM
+            string folderPath = FolderPicker.Show("Chọn thư mục chứa các bản vẽ DXF cần xuất BOM");
+            if (string.IsNullOrEmpty(folderPath)) return;
+
+            string[] dxfFiles = Directory.GetFiles(folderPath, "*.dxf", SearchOption.TopDirectoryOnly);
+            if (dxfFiles.Length == 0)
+            {
+                MessageBox.Show("Không tìm thấy file .dxf nào trong thư mục!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // 2. Chọn nơi lưu file Excel
+            string outputPath = "";
+            using (var saveDialog = new System.Windows.Forms.SaveFileDialog())
+            {
+                saveDialog.Filter = "Excel File|*.xlsx";
+                saveDialog.Title = "Lưu file BOM tổng hợp";
+                saveDialog.FileName = $"BOM_Export_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+                if (saveDialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+                outputPath = saveDialog.FileName;
+            }
+
+            // 3. Cập nhật trạng thái UI
+            SetUIState(false);
+            TxtStatus.Text = "Status: Scanning DXF & Exporting...";
+
+            try
+            {
+                BomScanResult scan = null;
+
+                // 4. Chạy xử lý nặng ở luồng ngầm
+                await Task.Run(() =>
+                {
+                    scan = BomDxfScanner.ScanFiles(dxfFiles);
+                    BomExcelExporter.Export(scan, outputPath);
+                });
+
+                TxtStatus.Text = "Status: Finished!";
+
+                string warningNote = scan.Warnings.Count > 0
+                    ? $"\n\nCó {scan.Warnings.Count} cảnh báo — xem sheet 'Warnings' trong file Excel."
+                    : "";
+
+                MessageBox.Show(
+                    $"Hoàn tất!\n\nĐã xuất {scan.Items.Count} dòng BOM từ {dxfFiles.Length} file DXF.\n{Path.GetFileName(outputPath)}{warningNote}",
+                    "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                TxtStatus.Text = "Status: Error occurred!";
+                MessageBox.Show($"Lỗi trong quá trình xử lý:\n{ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                SetUIState(true);
+            }
+        }
+
+        /// <summary>
         /// Quản lý trạng thái các nút bấm khi Tool đang bận
         /// </summary>
         private void SetUIState(bool isEnabled)
@@ -148,8 +211,10 @@ namespace CSSCADTools.Views
             BtnTotalLength.IsEnabled = isEnabled;
             BtnAverageMidpoint.IsEnabled = isEnabled;
             BtnRandomRename.IsEnabled = isEnabled;
-            
+            BtnExportBom.IsEnabled = isEnabled;
+
             BtnCheckDetails.Content = isEnabled ? "CHECK DETAILS" : "PROCESSING...";
+            BtnExportBom.Content = isEnabled ? "EXPORT BOM TO EXCEL" : "PROCESSING...";
         }
     }
 }
