@@ -6,13 +6,13 @@ using CSSCADTools.Models;
 
 namespace CSSCADTools.Utilities {
     /// <summary>
-    /// Quét nhiều file DXF, tìm block "SW_TABLEANNOTATION_*" trong mỗi file
+    /// Quét nhiều file DWG/DXF, tìm block "SW_TABLEANNOTATION_*" trong mỗi file
     /// và gom toàn bộ BOM item lại thành 1 kết quả duy nhất.
     /// SolidWorks đánh số thứ tự block table annotation theo số bảng có trong bản vẽ
     /// (_0, _1, _2...) nên bảng BOM thật KHÔNG cố định luôn ở "_1" — phải dò tất cả
     /// block cùng tiền tố và chỉ giữ lại block nào parse ra được header hợp lệ.
     /// </summary>
-    public static class BomDxfScanner {
+    public static class BomFileScanner {
         private const string BOM_BLOCK_PREFIX = "SW_TABLEANNOTATION_";
 
         // eProperClassSeparatorExpected (và 1 số lỗi DxfIn khác) đã quan sát thấy KHÔNG cố định
@@ -22,11 +22,12 @@ namespace CSSCADTools.Utilities {
         // Database hoàn toàn mới trước khi báo lỗi vĩnh viễn.
         private const int MAX_ATTEMPTS = 3;
 
-        public static BomScanResult ScanFiles(string[] dxfFiles) {
+        public static BomScanResult ScanFiles(string[] files) {
             var result = new BomScanResult();
 
-            foreach (string file in dxfFiles) {
+            foreach (string file in files) {
                 string fileName = Path.GetFileName(file);
+                bool isDwg = string.Equals(Path.GetExtension(file), ".dwg", StringComparison.OrdinalIgnoreCase);
                 string logPath = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(file) + "_dxfin.log");
 
                 bool success = false;
@@ -35,7 +36,11 @@ namespace CSSCADTools.Utilities {
                 for (int attempt = 1; attempt <= MAX_ATTEMPTS && !success; attempt++) {
                     using (Database db = new Database(false, true)) {
                         try {
-                            db.DxfIn(file, logPath);
+                            if (isDwg) {
+                                db.ReadDwgFile(file, FileOpenMode.OpenForReadAndAllShare, true, "");
+                            } else {
+                                db.DxfIn(file, logPath);
+                            }
 
                             using (Transaction tr = db.TransactionManager.StartTransaction()) {
                                 BlockTable bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
@@ -92,7 +97,9 @@ namespace CSSCADTools.Utilities {
                 }
 
                 if (!success) {
-                    result.Warnings.Add($"{fileName}: lỗi đọc file sau {MAX_ATTEMPTS} lần thử — {lastException?.Message} (xem log chi tiết: {logPath})");
+                    // Log chi tiết chỉ tồn tại với DXF (DxfIn có tham số log riêng, ReadDwgFile thì không)
+                    string logNote = isDwg ? "" : $" (xem log chi tiết: {logPath})";
+                    result.Warnings.Add($"{fileName}: lỗi đọc file sau {MAX_ATTEMPTS} lần thử — {lastException?.Message}{logNote}");
                 }
             }
 

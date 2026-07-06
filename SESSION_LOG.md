@@ -1,3 +1,21 @@
+## Session 2026-07-06 08:58
+
+### Đã làm
+
+- User yêu cầu mở rộng chức năng Export BOM để đọc được cả file `.dwg` (trước đây chỉ đọc `.dxf`).
+- Đổi tên `Utilities/BomDxfScanner.cs` → `Utilities/BomFileScanner.cs` (xóa file cũ), thêm dispatch theo đuôi file: `.dwg` → `db.ReadDwgFile(...)` (cùng pattern đã dùng ổn định trong `DwgDatabase.cs`), `.dxf` → `db.DxfIn(...)` như cũ. Cơ chế retry 3 lần vẫn áp dụng cho cả 2 loại.
+- Cập nhật `Views/MainPaletteControl.xaml.cs` (`BtnExportBom_Click`): quét cả `*.dxf` và `*.dwg` trong thư mục (gộp 2 danh sách), đổi text thông báo/prompt cho đúng phạm vi DWG/DXF.
+- Build thành công → `CSSCADTools_20260706_0858.dll`.
+- Không có sẵn file `.dwg` mẫu chứa block `SW_TABLEANNOTATION_*` trong bộ dữ liệu test hiện tại nên KHÔNG tự kiểm chứng end-to-end được cho đường dẫn DWG — chỉ dựa vào việc tái sử dụng đúng pattern `ReadDwgFile` đã chạy ổn định ở tính năng "CHECK DETAILS".
+
+### Trạng thái
+
+- Code xong, build xong. Đường dẫn đọc DXF không đổi logic, không cần test lại. Đường dẫn đọc DWG CHƯA được test thật với file mẫu.
+
+### Bước tiếp theo
+
+- User cần tự test với ít nhất 1 file `.dwg` thật có chứa block `SW_TABLEANNOTATION_*` (NETLOAD `CSSCADTools_20260706_0858.dll`, để chung 1 thư mục với các file dxf hoặc thư mục riêng, bấm "EXPORT BOM TO EXCEL") để xác nhận đường dẫn ReadDwgFile hoạt động đúng như DxfIn.
+
 ## Session 2026-07-04 21:35
 
 ### Đã làm
