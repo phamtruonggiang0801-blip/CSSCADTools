@@ -31,6 +31,11 @@ namespace CSSCADTools.Utilities
             var sectionMarkSources = new Dictionary<string, (string Original, string File)>(StringComparer.OrdinalIgnoreCase);
             var allTextByFile = new Dictionary<string, List<string>>();
 
+            // Dữ liệu trung gian cho Detail classification — CHỈ thu thập trong lúc quét, KHÔNG
+            // quyết định định nghĩa/tham chiếu ngay tại đây (xem ClassifyDetails bên dưới để biết
+            // lý do: phải quét XONG toàn bộ file mới quyết định được, tránh phụ thuộc thứ tự file).
+            var perFileDetails = new List<(string FileName, string SourceType, List<string> Distinct, Dictionary<string, int> Occurrence)>();
+
             foreach (string file in filteredFiles)
             {
                 using (Database sideDb = new Database(false, true))
@@ -122,30 +127,17 @@ namespace CSSCADTools.Utilities
                                 allTextByFile[fileName] = textsInFile;
                             }
 
-                            // Detail classification
-                            foundDetailsInFile = foundDetailsInFile.Distinct().ToList();
+                            // Đếm số lần MỖI Detail ID xuất hiện trong CHÍNH FILE NÀY (mọi entity,
+                            // DBText lẫn MText, kể cả trùng lặp) — CHỈ thu thập, chưa quyết định
+                            // định nghĩa/tham chiếu (xem ClassifyDetails, gọi sau khi quét hết file).
+                            var occurrenceCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var det in foundDetailsInFile)
+                            {
+                                occurrenceCount.TryGetValue(det, out int c);
+                                occurrenceCount[det] = c + 1;
+                            }
 
-                            if (detectedSourceType != null)
-                            {
-                                foreach (var det in foundDetailsInFile)
-                                {
-                                    result.SourceDetails.Add(new DetailInfo {
-                                        DetailId = det,
-                                        SourceFile = fileName,
-                                        SourceType = detectedSourceType
-                                    });
-                                }
-                            }
-                            else
-                            {
-                                foreach (var det in foundDetailsInFile)
-                                {
-                                    if (!result.DetailDefinitions.ContainsKey(det))
-                                    {
-                                        result.DetailDefinitions.Add(det, fileName);
-                                    }
-                                }
-                            }
+                            perFileDetails.Add((fileName, detectedSourceType, foundDetailsInFile.Distinct().ToList(), occurrenceCount));
 
                             tr.Commit();
                         }
@@ -156,10 +148,121 @@ namespace CSSCADTools.Utilities
                 }
             }
 
+            // Detail classification — chạy SAU khi đã quét XONG toàn bộ file (không phải trong
+            // lúc quét từng file) để KHÔNG phụ thuộc thứ tự file được xử lý trước/sau.
+            ClassifyDetails(perFileDetails, result);
+
             // Section Mark cross-reference (delegate sang SectionScanner)
             result.SectionMarks = SectionScanner.CrossReference(sectionMarkSources, allTextByFile);
 
             return result;
+        }
+
+        /// <summary>
+        /// Quyết định MỖI Detail ID là "định nghĩa" hay "tham chiếu" — làm SAU KHI đã quét hết
+        /// mọi file (không phải trong lúc quét từng file), qua 2 bước:
+        ///
+        /// 1. TỰ ĐỦ trong 1 file: Detail ID xuất hiện ≥2 lần trong CHÍNH 1 file (bất kể entity
+        ///    gì) — đây là detail TIÊU CHUẨN/ĐIỂN HÌNH được vẽ lại đầy đủ độc lập trên từng bản vẽ
+        ///    áp dụng, không cần tra cứu chéo. Luôn đăng ký "đã định nghĩa" tại chính file đó.
+        ///
+        /// 2. TỰ ĐỦ giữa NHIỀU file "không phân loại được" (title block không khớp 4 loại cấu
+        ///    kiện đã biết — vd nhóm "General Details"): nếu 1 Detail ID xuất hiện (đúng 1 lần
+        ///    mỗi file) ở ≥2 file khác nhau trong nhóm này, TẤT CẢ các file đó đang cùng nhắc tới
+        ///    1 detail — chọn 1 file (theo thứ tự ALPHABET, KHÔNG phụ thuộc thứ tự quét, để kết
+        ///    quả ổn định/lặp lại được) làm "Defined In File" hiển thị, các file còn lại đăng ký
+        ///    là THAM CHIẾU CHÉO thật (SourceType = "GENERAL DETAILS"). Trước đây, do xử lý XEN
+        ///    KẼ trong lúc quét, chỉ file được xử lý ĐẦU TIÊN mới "thắng" đăng ký định nghĩa, các
+        ///    file còn lại (dù rõ ràng đang tham chiếu tới CÙNG 1 Detail ID) bị bỏ qua ÂM THẦM —
+        ///    không tạo được quan hệ tham chiếu nào cả, khiến MỌI Detail ID trong nhóm này luôn
+        ///    báo UNREFERENCED ở sheet REVERSE dù rõ ràng có nhiều bản vẽ đang dùng chung.
+        ///
+        /// Phần còn lại (file được phân loại 1 trong 4 Source Type đã biết, HOẶC file không phân
+        /// loại được nhưng Detail ID chỉ xuất hiện đúng 1 nơi duy nhất trong toàn bộ batch quét)
+        /// giữ nguyên hành vi cũ.
+        /// </summary>
+        private static void ClassifyDetails(
+            List<(string FileName, string SourceType, List<string> Distinct, Dictionary<string, int> Occurrence)> perFileDetails,
+            ScanResult result)
+        {
+            // Bước 1: tự đủ TRONG CÙNG 1 file.
+            foreach (var pf in perFileDetails)
+            {
+                var selfDefined = pf.Distinct.Where(d => pf.Occurrence[d] >= 2).ToList();
+                foreach (var det in selfDefined)
+                {
+                    if (!result.DetailDefinitions.ContainsKey(det))
+                    {
+                        result.DetailDefinitions.Add(det, pf.FileName);
+                    }
+                    result.SelfDefinedDetails.Add(det);
+                }
+            }
+
+            // Bước 2: với các Detail ID CHƯA tự đủ (bước 1), đếm nó xuất hiện ở BAO NHIÊU FILE
+            // KHÁC NHAU trên toàn bộ batch quét — dùng cho case "tự đủ giữa nhiều file" ở dưới.
+            var filesContaining = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pf in perFileDetails)
+            {
+                foreach (var det in pf.Distinct)
+                {
+                    if (result.SelfDefinedDetails.Contains(det)) continue;
+
+                    if (!filesContaining.TryGetValue(det, out var fileSet))
+                    {
+                        fileSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        filesContaining[det] = fileSet;
+                    }
+                    fileSet.Add(pf.FileName);
+                }
+            }
+
+            foreach (var pf in perFileDetails)
+            {
+                var stillNeedsCheck = pf.Distinct.Where(d => !result.SelfDefinedDetails.Contains(d)).ToList();
+
+                foreach (var det in stillNeedsCheck)
+                {
+                    if (pf.SourceType != null)
+                    {
+                        // File phân loại được (1 trong 4 loại cấu kiện đã biết) — giữ nguyên hành
+                        // vi cũ: luôn coi là THAM CHIẾU cần tra cứu chéo.
+                        result.SourceDetails.Add(new DetailInfo {
+                            DetailId = det,
+                            SourceFile = pf.FileName,
+                            SourceType = pf.SourceType
+                        });
+                    }
+                    else if (filesContaining.TryGetValue(det, out var filesWithThisDetail) && filesWithThisDetail.Count >= 2)
+                    {
+                        // Tự đủ GIỮA NHIỀU FILE không phân loại được — xem doc-comment ở trên.
+                        string definer = filesWithThisDetail.OrderBy(f => f, StringComparer.OrdinalIgnoreCase).First();
+                        if (!result.DetailDefinitions.ContainsKey(det))
+                        {
+                            result.DetailDefinitions.Add(det, definer);
+                        }
+
+                        if (!string.Equals(pf.FileName, definer, StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.SourceDetails.Add(new DetailInfo {
+                                DetailId = det,
+                                SourceFile = pf.FileName,
+                                SourceType = "GENERAL DETAILS"
+                            });
+                        }
+                    }
+                    else
+                    {
+                        // Chỉ 1 file duy nhất trong toàn bộ batch có Detail ID này — giữ nguyên
+                        // hành vi cũ: coi là ĐỊNH NGHĨA (có thể là Detail Sheet thật chưa ai tham
+                        // chiếu tới — REVERSE sẽ đúng đắn báo UNREFERENCED nếu thật sự không ai dùng).
+                        if (!result.DetailDefinitions.ContainsKey(det))
+                        {
+                            result.DetailDefinitions.Add(det, pf.FileName);
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>

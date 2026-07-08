@@ -1,3 +1,84 @@
+## Session 2026-07-08 02:20
+
+### Đã làm
+
+- User dán kết quả thật (Catalog + REVERSE) cho 2 nhóm detail mới: **G56** (DBText "DET.G56" ở 4 file khác nhau 2006/2154/2204/2304, MỖI FILE chỉ 1 lần) và **J1-J5** (5 DBText ở file 2701 + 3 MText tham chiếu "MIRROR IMAGE" ở 2702/2703/2704) — CẢ 2 nhóm đều báo UNREFERENCED 100% dù rõ ràng nhiều file đang dùng chung.
+- **Phân tích**: khác session trước (detail lặp ≥2 lần TRONG CÙNG 1 file), đây là detail xuất hiện Ở NHIỀU FILE KHÁC NHAU, mỗi file chỉ 1 lần — rule "≥2 lần/file" (session trước) không bắt được case này, nên rơi về nhánh cũ: file `detectedSourceType == null` → MỌI file đều bị coi là "definer". Vì `DetailDefinitions` là Dictionary (chỉ thêm nếu chưa có key), CHỈ file được xử lý ĐẦU TIÊN trong vòng lặp quét mới thật sự đăng ký được — các file còn lại (dù đang tham chiếu tới CÙNG Detail ID) bị bỏ qua ÂM THẦM, không tạo được `SourceDetails` nào → REVERSE luôn báo UNREFERENCED.
+- Xác nhận qua AskUserQuestion: các file này (2006/2154/2204/2304/2701-2704) có title block thuộc loại **"General Details"** — KHÔNG nằm trong 4 loại đang nhận diện (TOP PLATE/BOTTOM PLATE/LONGITUDINAL BEAM/TRANSVERSAL PLATE) — đúng khớp phân tích.
+- **Thiết kế lại `DwgDatabase.ScanFiles`** thành 2 GIAI ĐOẠN thay vì xử lý xen kẽ trong lúc quét (tránh phụ thuộc thứ tự file — rủi ro thật: nếu file tham chiếu vô tình được xử lý TRƯỚC file định nghĩa thật, code cũ sẽ đăng ký NHẦM file tham chiếu làm "definer"):
+  1. **Giai đoạn quét**: mỗi file chỉ THU THẬP `(FileName, SourceType, DistinctDetails, OccurrenceCount)` vào `perFileDetails`, KHÔNG quyết định định nghĩa/tham chiếu ngay.
+  2. **Giai đoạn phân loại** (`ClassifyDetails`, chạy SAU khi quét xong TOÀN BỘ file): (a) tự đủ trong 1 file (rule cũ, ≥2 lần/file, không đổi); (b) **MỚI** — với Detail ID chưa tự đủ, nếu KHÔNG phân loại được (title block không khớp 4 loại đã biết) VÀ xuất hiện ở ≥2 FILE KHÁC NHAU trong nhóm này → tất cả các file đó tự thỏa mãn lẫn nhau: chọn 1 file theo THỨ TỰ ALPHABET (ổn định, không phụ thuộc thứ tự quét) làm "Defined In File", các file còn lại đăng ký THAM CHIẾU CHÉO thật (SourceType="GENERAL DETAILS") thay vì bị bỏ qua âm thầm; (c) chỉ 1 file duy nhất có Detail ID đó trong toàn batch → giữ nguyên hành vi cũ (định nghĩa, có thể UNREFERENCED nếu thật sự không ai dùng).
+- Build 0 lỗi. `DwgDatabase.cs` dùng AutoCAD API nên tách riêng ĐÚNG thuật toán `ClassifyDetails` (thuần, không phụ thuộc AutoCAD) ra scratch project `detailtest`, mô phỏng chính xác dữ liệu G56 và J-series (kể cả test đảo NGƯỢC thứ tự file đầu vào để xác nhận order-independence): 8/8 test PASS — G56 định nghĩa đúng ở 2006 (alphabet đầu), 3 file còn lại đúng thành tham chiếu; J1-J5 định nghĩa đúng ở 2701, 3 file MText đúng thành tham chiếu; thứ tự file đảo ngược cho kết quả GIỐNG HỆT.
+
+### Trạng thái
+
+- `DwgDatabase.ScanFiles` giờ tách rõ 2 pha (thu thập → phân loại), loại bỏ hoàn toàn phụ thuộc thứ tự xử lý file — an toàn hơn đáng kể so với cách cũ (xử lý xen kẽ, "ai trước thắng").
+- Nhóm file "General Details" (hoặc bất kỳ loại title block nào KHÔNG thuộc 4 loại đã biết) giờ được xử lý đúng như 1 mạng lưới định nghĩa/tham chiếu CHÉO LẪN NHAU, thay vì mặc định coi TẤT CẢ là "definer" như trước.
+
+### Bước tiếp theo
+
+- NETLOAD bản build mới, bấm CHECK DETAILS trên đúng bộ file đã phân tích (G56/J-series) — xác nhận G56 hiện đúng "Defined In 2006.dwg", tham chiếu từ 2154/2204/2304 đều OK (không còn UNREFERENCED); J1-J5 tương tự với 2701 làm gốc.
+- Nếu sau này phát hiện thêm loại title block khác (ngoài "General Details") cũng rơi vào tình huống tương tự (không thuộc 4 loại đã biết), cơ chế mới sẽ TỰ ĐỘNG xử lý đúng — không cần sửa code thêm, vì logic không còn phụ thuộc vào việc liệt kê hết mọi loại title block có thể có.
+
+## Session 2026-07-08 01:40
+
+### Đã làm
+
+- User hỏi lại tác dụng sheet REVERSE — đã giải thích: DETAIL kiểm tra chiều "tham chiếu → có định nghĩa không" (bắt tham chiếu treo/MISSING), REVERSE kiểm tra chiều NGƯỢC LẠI "định nghĩa → có ai tham chiếu tới không" (bắt detail mồ côi/UNREFERENCED — dư thừa hoặc lỗi gõ sai tên).
+- **Tự phát hiện hệ quả từ fix session trước** (detail "tự đủ" ≥2 lần/file, vd S1/S1M): các detail này được thêm vào `DetailDefinitions` nhưng bị loại khỏi `SourceDetails` (không cần tra cứu chéo nữa) — mà REVERSE lại xây lookup từ `SourceDetails`, nên các detail tự đủ này giờ LUÔN bị báo UNREFERENCED sai, dù thực chất đang được dùng (2 lần ngay trong file của chính nó).
+- User xác nhận cần sửa. Đã thêm `ScanResult.SelfDefinedDetails` (`HashSet<string>`, `Models/DetailModels.cs`) — đánh dấu riêng các Detail ID đã được xác định là "tự đủ" trong `DwgDatabase.cs` (ngay tại điểm đăng ký vào `DetailDefinitions` do đạt ngưỡng ≥2 lần). Sửa `FileExporter.BuildReverseSheet`: bỏ qua (không tạo dòng) cho bất kỳ Detail ID nào có trong `SelfDefinedDetails`, trước khi kiểm tra UNREFERENCED.
+- Build 0 lỗi. `FileExporter.cs` không phụ thuộc AutoCAD nên test lại được trực tiếp bằng scratch project `reporttest` (đã có từ session tạo Excel report): thêm ca test "DET.S1 tự đủ" — xác nhận DET.S1 hoàn toàn KHÔNG xuất hiện trong sheet REVERSE nữa, trong khi DET.102/DET.103 (thật sự không ai tham chiếu) vẫn đúng UNREFERENCED như cũ. 0 lỗi OpenXml validation.
+
+### Trạng thái
+
+- Sheet REVERSE giờ CHỈ còn báo UNREFERENCED cho detail THẬT SỰ không ai dùng tới (cả tự dùng lẫn tham chiếu chéo đều không có) — không còn báo nhầm các detail tiêu chuẩn/điển hình tự đủ.
+- `ScanResult.SelfDefinedDetails` là điểm nối chung giữa `DwgDatabase.cs` (nơi phát hiện) và `FileExporter.cs` (nơi dùng để lọc) — nếu sau này có thêm sheet/kiểm tra khác cần biết "detail nào tự đủ", tái dùng field này, không cần tính lại.
+
+### Bước tiếp theo
+
+- NETLOAD bản build mới, bấm CHECK DETAILS trên đúng bộ file đã phân tích — xác nhận S1/S1M không còn xuất hiện ở CẢ 2 sheet DETAIL và REVERSE (tự đủ, không cần kiểm tra chiều nào); Y2 vẫn đúng MISSING (DETAIL) nếu thật sự chưa có nơi định nghĩa.
+
+## Session 2026-07-08 01:20
+
+### Đã làm
+
+- User dán kết quả thật từ báo cáo Excel mới (sheet DATALOG + DETAIL) của tính năng Check Details: **100% Detail ID (S1, S1M, Y2) đều báo MISSING**, dù DATALOG cho thấy dữ liệu rõ ràng có đầy đủ (DBText "DET.S1"→S1, "DET.S1m"→S1M, kèm MText ghi chú).
+- **Phân tích root cause**: `Utilities/DwgDatabase.cs` phân loại **CẢ FILE** (không phải từng Detail ID) vào 1 trong 2 vai trò DUY NHẤT — "REFERENCE" (nếu title block `_MCG_TITLE_NEW` khớp 1 trong 4 loại cấu kiện: TOP PLATE/BOTTOM PLATE/LONGITUDINAL BEAM/TRANSVERSAL PLATE) hoặc "DEFINITION" (nếu không khớp loại nào). Vì **cả 6 file** trong dữ liệu mẫu đều được phân loại "LONGITUDINAL BEAM" → tất cả rơi vào nhánh REFERENCE → `DetailDefinitions` (nơi tra cứu "detail này định nghĩa ở đâu") **RỖNG HOÀN TOÀN** → mọi tra cứu đều MISSING, bất kể dữ liệu thật.
+- Xác nhận qua 2 vòng AskUserQuestion: (1) detail S1/S1m/Y2 được vẽ **NGAY TRÊN chính các bản vẽ Longitudinal Beam** đó (không tách file Detail Sheet riêng); (2) đây là detail **TIÊU CHUẨN/ĐIỂN HÌNH** — mỗi bản vẽ áp dụng tự vẽ lại độc lập, KHÔNG phải Detail ID duy nhất toàn dự án cần tra cứu chéo; (3) quy tắc nhận diện "tự đủ": Detail ID xuất hiện **≥ 2 lần trong CHÍNH file đó** (bất kể loại entity DBText/MText) thì coi là đã tự vẽ đầy đủ tại chỗ, không cần tra cứu chéo, không báo MISSING.
+- Sửa `Utilities/DwgDatabase.cs` (phần "Detail classification" trong `ScanFiles`): đổi từ phân loại NHỊ PHÂN theo CẢ FILE sang phân loại THEO TỪNG DETAIL ID — đếm `occurrenceCount` của mỗi Detail ID trong CHÍNH file đó (mọi entity, kể cả trùng lặp); Detail ID đạt ≥2 lần → LUÔN đăng ký vào `DetailDefinitions` (tự đủ, bất kể title block); phần còn lại (chỉ 1 lần) → giữ nguyên logic cũ (file có Source Type → coi là tham chiếu cần tra cứu chéo; file không phân loại được → vẫn coi là định nghĩa).
+- Build 0 lỗi. `DwgDatabase.cs` dùng AutoCAD API nên không test trực tiếp được — tách riêng ĐÚNG thuật toán phân loại (không phụ thuộc AutoCAD, chỉ thao tác `List<string>`/`Dictionary`) ra scratch project `detailtest` độc lập, mô phỏng đúng dữ liệu thật (S1/S1M xuất hiện 2 lần/file trên 4 file, Y2 chỉ 1 lần/file trên 2 file, không nơi nào khác định nghĩa Y2): 5/5 test PASS — S1/S1M không còn vào danh sách cần tra cứu chéo (tự đủ); Y2 vẫn đúng là MISSING thật (không nơi nào định nghĩa, khớp đúng quy tắc ≥2 lần).
+
+### Trạng thái
+
+- Cơ chế Detail classification giờ hoạt động ở CẤP ĐỘ TỪNG DETAIL ID thay vì cả file — 1 file có thể VỪA tự định nghĩa 1 số detail (tiêu chuẩn, lặp lại ≥2 lần) VỪA tham chiếu detail khác (chỉ xuất hiện 1 lần, cần tra cứu chéo) trong CÙNG lúc, khớp đúng thực tế bản vẽ.
+- Sheet DETAIL trong báo cáo giờ CHỈ còn liệt kê các Detail ID THẬT SỰ cần tra cứu chéo (xuất hiện đúng 1 lần trong file chứa nó) — các detail tiêu chuẩn tự đủ sẽ không còn tạo dòng kiểm tra thừa nữa (giảm nhiễu, chỉ báo đúng những trường hợp cần chú ý thật).
+
+### Bước tiếp theo
+
+- NETLOAD bản build mới, bấm CHECK DETAILS trên đúng bộ 6 file đã phân tích — xác nhận S1/S1M không còn xuất hiện trong sheet DETAIL (tự đủ), Y2 vẫn đúng MISSING nếu thật sự không có bản vẽ nào khác định nghĩa nó.
+- Nếu sau này phát hiện detail tiêu chuẩn nào đó CHỈ xuất hiện đúng 1 lần trong 1 file (vd chỉ có DBText, không có MText ghi chú kèm theo) nhưng vẫn là loại "tự vẽ tại chỗ" — quy tắc "≥2 lần" sẽ không bắt được, cần xem xét lại ngưỡng hoặc bổ sung tín hiệu khác.
+
+## Session 2026-07-08 00:45
+
+### Đã làm
+
+- User yêu cầu ngắn gọn "Detail Management: Gộp 4 file thành 1 file report" — không rõ ngay "Detail Management" là gì trong project này, đã dùng Explore agent tra cứu: đây là nhãn mô tả (không phải class/namespace) cho tính năng nút **CHECK DETAILS** hiện có (`Views/MainPaletteControl.xaml.cs:26` `BtnCheckDetails_Click`) — quét thư mục DWG, đối chiếu Detail giữa Top Plate và Detail Sheet, xuất báo cáo. Không liên quan tới BOM/Assembly List đang làm các session trước.
+- Đọc `Utilities/FileExporter.cs` (cũ): tính năng này xuất **4 file CSV riêng** — `_DETAIL.csv`, `_REVERSE.csv`, `_SECTION.csv` (cả 3 từ `ExportReport()`), và `_DATALOG.csv` (từ `ExportDataLog()`, gọi riêng ở `MainPaletteControl.xaml.cs:64`).
+- Xác nhận qua AskUserQuestion (2 vòng, vì yêu cầu ban đầu quá ngắn): (1) 4 file nguồn = 4 CSV từ chính chức năng Check Details; (2) thay HẲN nút CHECK DETAILS bằng xuất 1 file `.xlsx` duy nhất (không giữ CSV song song).
+- Viết lại hoàn toàn `Utilities/FileExporter.cs`: bỏ `ExportReport`/`ExportDataLog` (CSV), thay bằng `ExportReportExcel(scan, outputPath)` — dùng LẠI `MinimalXlsxWriter` (đã có sẵn, viết tay OOXML, không dùng ClosedXML — tránh đúng lỗi xung đột SixLabors.Fonts trong AutoCAD đã gặp ở phần BOM) để xuất 1 file `.xlsx` với 4 sheet tên **DETAIL / REVERSE / SECTION / DATALOG** (đặt tên theo đúng hậu tố của 4 file CSV cũ, đúng yêu cầu user). Logic nghiệp vụ (tra cứu `DetailDefinitions`, gộp `refLookup` cho Reverse Check...) giữ NGUYÊN 100%, chỉ đổi định dạng ghi ra — riêng phần `EscapeCsvField` (escape dấu phẩy/ngoặc kép cho CSV) được BỎ vì không cần thiết với Excel (MinimalXlsxWriter tự escape XML).
+- Sửa `Views/MainPaletteControl.xaml.cs` (`BtnCheckDetails_Click`): đổi `SaveFileDialog` filter từ `*.csv` sang `*.xlsx`, gọi `FileExporter.ExportReportExcel(scan, reportPath)` thay vì 2 lệnh CSV cũ, rút gọn thông báo hoàn tất còn 1 dòng tên file (không còn liệt kê 4 file).
+- Build 0 lỗi (0 caller nào khác của `ExportReport`/`ExportDataLog` bị bỏ sót — xác nhận qua build sạch, không cần giữ lại code chết).
+- `FileExporter.cs` KHÔNG phụ thuộc AutoCAD API (chỉ dùng `Models.ScanResult` thuần + `MinimalXlsxWriter`) nên test được ngoài AutoCAD: tạo scratch project `reporttest` (net8 + OpenXml SDK), dữ liệu mẫu phủ đủ nhánh (Detail OK/MISSING, Reverse OK/UNREFERENCED, DataLog có dấu phẩy+ngoặc kép để xác nhận không còn artifact escape CSV) — kết quả: cả 4 sheet đúng tên, đúng dữ liệu, đúng logic nghiệp vụ gốc, 0 lỗi OpenXml validation.
+
+### Trạng thái
+
+- Nút CHECK DETAILS giờ xuất 1 file Excel duy nhất (4 sheet) thay vì 4 file CSV rời rạc — đúng yêu cầu "gộp 4 file thành 1 file report".
+- Đây là thay đổi cho tính năng KHÁC (Check Details / Detail Management) — hoàn toàn tách biệt với luồng BOM/Assembly List đã xây các session trước, không ảnh hưởng lẫn nhau.
+
+### Bước tiếp theo
+
+- NETLOAD bản build mới, bấm CHECK DETAILS trên 1 bộ DWG thật, xác nhận file `.xlsx` xuất ra đúng 4 sheet với dữ liệu đúng như 4 file CSV trước đây.
+
 ## Session 2026-07-08 00:10
 
 ### Đã làm

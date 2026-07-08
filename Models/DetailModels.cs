@@ -33,6 +33,13 @@ namespace CSSCADTools.Models {
     public class ScanResult {
         public List<DetailInfo> SourceDetails { get; set; } = new List<DetailInfo>();
         public Dictionary<string, string> DetailDefinitions { get; set; } = new Dictionary<string, string>();
+
+        /// <summary>Detail ID "tự đủ" (xuất hiện ≥2 lần trong CHÍNH file định nghĩa nó — vd detail
+        /// tiêu chuẩn/điển hình được vẽ lại độc lập trên nhiều bản vẽ) — dùng để loại khỏi kiểm tra
+        /// "UNREFERENCED" ở sheet REVERSE, vì bản chất đã tự dùng ngay trong file của chính nó,
+        /// không cần chờ 1 bản vẽ khác tham chiếu chéo tới mới coi là "có dùng".</summary>
+        public HashSet<string> SelfDefinedDetails { get; set; } = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+
         public List<SectionMarkInfo> SectionMarks { get; set; } = new List<SectionMarkInfo>();
         public List<DataLogEntry> DataLog { get; set; } = new List<DataLogEntry>();
     }

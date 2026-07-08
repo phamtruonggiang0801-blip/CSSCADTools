@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using CSSCADTools.Models;
 
 namespace CSSCADTools.Utilities
@@ -8,107 +7,132 @@ namespace CSSCADTools.Utilities
     public static class FileExporter
     {
         /// <summary>
-        /// Xuất 2 file CSV: Detail Check + Section Mark Check.
-        /// basePath là đường dẫn gốc do user chọn (VD: Report_20260416_1100.csv)
+        /// Xuất 1 file Excel (.xlsx) DUY NHẤT gồm 4 sheet — DETAIL, REVERSE, SECTION, DATALOG —
+        /// gộp từ 4 báo cáo CSV riêng lẻ trước đây (Detail Check, Reverse Check, Section Mark
+        /// Check, Datalog) để user chỉ cần mở 1 file thay vì 4 file rời rạc. Dùng
+        /// MinimalXlsxWriter (viết tay OOXML) — KHÔNG dùng ClosedXML (xem lý do trong
+        /// MinimalXlsxWriter.cs: xung đột SixLabors.Fonts trong tiến trình AutoCAD).
         /// </summary>
-        public static void ExportReport(ScanResult scan, string basePath)
+        public static void ExportReportExcel(ScanResult scan, string outputPath)
         {
-            string dir = Path.GetDirectoryName(basePath);
-            string name = Path.GetFileNameWithoutExtension(basePath);
+            var sheets = new List<MinimalXlsxWriter.SheetData> {
+                BuildDetailSheet(scan),
+                BuildReverseSheet(scan),
+                BuildSectionSheet(scan),
+                BuildDataLogSheet(scan)
+            };
 
-            // File 1: DETAIL CHECK
-            string detailPath = Path.Combine(dir, name + "_DETAIL.csv");
-            using (StreamWriter sw = new StreamWriter(detailPath, false, new System.Text.UTF8Encoding(true)))
-            {
-                sw.WriteLine("Detail ID,Source Type,Source File,Details File,Status");
-                foreach (var item in scan.SourceDetails)
-                {
-                    string target = scan.DetailDefinitions.TryGetValue(item.DetailId, out string foundInFile) ? foundInFile : "---";
-                    string status = target == "---" ? "MISSING" : "OK";
-                    sw.WriteLine($"DET.{item.DetailId},{item.SourceType},{item.SourceFile},{target},{status}");
-                }
-            }
-
-            // File 2: REVERSE CHECK — Detail Sheet → có được tham chiếu không?
-            string reversePath = Path.Combine(dir, name + "_REVERSE.csv");
-            using (StreamWriter sw = new StreamWriter(reversePath, false, new System.Text.UTF8Encoding(true)))
-            {
-                sw.WriteLine("Detail ID,Defined In File,Referenced By,Source Type,Status");
-
-                // Tạo lookup nhanh: detailId → list of (sourceFile, sourceType)
-                var refLookup = new Dictionary<string, List<(string File, string Type)>>(StringComparer.OrdinalIgnoreCase);
-                foreach (var src in scan.SourceDetails)
-                {
-                    if (!refLookup.ContainsKey(src.DetailId))
-                        refLookup[src.DetailId] = new List<(string, string)>();
-                    // Tránh trùng lặp cùng file
-                    bool exists = false;
-                    foreach (var r in refLookup[src.DetailId])
-                        if (string.Equals(r.File, src.SourceFile, StringComparison.OrdinalIgnoreCase)) { exists = true; break; }
-                    if (!exists)
-                        refLookup[src.DetailId].Add((src.SourceFile, src.SourceType));
-                }
-
-                foreach (var kvp in scan.DetailDefinitions)
-                {
-                    string detailId = kvp.Key;
-                    string definedIn = kvp.Value;
-
-                    if (refLookup.TryGetValue(detailId, out var refs))
-                    {
-                        foreach (var r in refs)
-                        {
-                            sw.WriteLine($"DET.{detailId},{definedIn},{r.File},{r.Type},OK");
-                        }
-                    }
-                    else
-                    {
-                        sw.WriteLine($"DET.{detailId},{definedIn},---,---,UNREFERENCED");
-                    }
-                }
-            }
-
-            // File 3: SECTION MARK CHECK
-            string sectionPath = Path.Combine(dir, name + "_SECTION.csv");
-            using (StreamWriter sw = new StreamWriter(sectionPath, false, new System.Text.UTF8Encoding(true)))
-            {
-                sw.WriteLine("Section Mark Value,Source File,Check File,Check Status");
-                foreach (var item in scan.SectionMarks)
-                {
-                    sw.WriteLine($"{item.MarkValue},{item.SourceFile},{item.CheckFile},{item.CheckStatus}");
-                }
-            }
+            MinimalXlsxWriter.Write(outputPath, sheets);
         }
 
-        /// <summary>
-        /// Xuất file Datalog CSV.
-        /// </summary>
-        public static void ExportDataLog(ScanResult scan, string basePath)
+        private static MinimalXlsxWriter.SheetData BuildDetailSheet(ScanResult scan)
         {
-            string dir = Path.GetDirectoryName(basePath);
-            string name = Path.GetFileNameWithoutExtension(basePath);
-            string logPath = Path.Combine(dir, name + "_DATALOG.csv");
-
-            using (StreamWriter sw = new StreamWriter(logPath, false, new System.Text.UTF8Encoding(true)))
+            var sheet = new MinimalXlsxWriter.SheetData
             {
-                sw.WriteLine("File Name,Entity Type,Raw Content,Extracted Result");
-                foreach (var entry in scan.DataLog)
-                {
-                    string safeRaw = EscapeCsvField(entry.RawContent);
-                    string safeResult = EscapeCsvField(entry.ExtractedResult);
-                    sw.WriteLine($"{entry.FileName},{entry.EntityType},{safeRaw},{safeResult}");
-                }
+                Name = "DETAIL",
+                Headers = new[] { "Detail ID", "Source Type", "Source File", "Details File", "Status" },
+                ColumnWidths = new double[] { 14, 14, 30, 30, 12 },
+                FreezeHeaderRow = true,
+                AutoFilter = true
+            };
+
+            foreach (var item in scan.SourceDetails)
+            {
+                string target = scan.DetailDefinitions.TryGetValue(item.DetailId, out string foundInFile) ? foundInFile : "---";
+                string status = target == "---" ? "MISSING" : "OK";
+                sheet.Rows.Add(new object[] { $"DET.{item.DetailId}", item.SourceType, item.SourceFile, target, status });
             }
+
+            return sheet;
         }
 
-        private static string EscapeCsvField(string value)
+        private static MinimalXlsxWriter.SheetData BuildReverseSheet(ScanResult scan)
         {
-            if (string.IsNullOrEmpty(value)) return "";
-            if (value.Contains(",") || value.Contains("\"") || value.Contains("\n") || value.Contains("\r") || value.Contains("\\"))
+            var sheet = new MinimalXlsxWriter.SheetData
             {
-                return "\"" + value.Replace("\"", "\"\"") + "\"";
+                Name = "REVERSE",
+                Headers = new[] { "Detail ID", "Defined In File", "Referenced By", "Source Type", "Status" },
+                ColumnWidths = new double[] { 14, 30, 30, 14, 14 },
+                FreezeHeaderRow = true,
+                AutoFilter = true
+            };
+
+            // Tạo lookup nhanh: detailId → list of (sourceFile, sourceType)
+            var refLookup = new Dictionary<string, List<(string File, string Type)>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var src in scan.SourceDetails)
+            {
+                if (!refLookup.ContainsKey(src.DetailId))
+                    refLookup[src.DetailId] = new List<(string, string)>();
+                // Tránh trùng lặp cùng file
+                bool exists = false;
+                foreach (var r in refLookup[src.DetailId])
+                    if (string.Equals(r.File, src.SourceFile, StringComparison.OrdinalIgnoreCase)) { exists = true; break; }
+                if (!exists)
+                    refLookup[src.DetailId].Add((src.SourceFile, src.SourceType));
             }
-            return value;
+
+            foreach (var kvp in scan.DetailDefinitions)
+            {
+                string detailId = kvp.Key;
+                string definedIn = kvp.Value;
+
+                // Detail "tự đủ" (xuất hiện ≥2 lần ngay trong file định nghĩa nó, vd detail tiêu
+                // chuẩn/điển hình) đã coi như tự dùng tại chỗ — bỏ qua khỏi kiểm tra REVERSE, vì
+                // không tham chiếu chéo sang file khác không có nghĩa là "không ai dùng".
+                if (scan.SelfDefinedDetails.Contains(detailId)) continue;
+
+                if (refLookup.TryGetValue(detailId, out var refs))
+                {
+                    foreach (var r in refs)
+                    {
+                        sheet.Rows.Add(new object[] { $"DET.{detailId}", definedIn, r.File, r.Type, "OK" });
+                    }
+                }
+                else
+                {
+                    sheet.Rows.Add(new object[] { $"DET.{detailId}", definedIn, "---", "---", "UNREFERENCED" });
+                }
+            }
+
+            return sheet;
+        }
+
+        private static MinimalXlsxWriter.SheetData BuildSectionSheet(ScanResult scan)
+        {
+            var sheet = new MinimalXlsxWriter.SheetData
+            {
+                Name = "SECTION",
+                Headers = new[] { "Section Mark Value", "Source File", "Check File", "Check Status" },
+                ColumnWidths = new double[] { 20, 30, 30, 14 },
+                FreezeHeaderRow = true,
+                AutoFilter = true
+            };
+
+            foreach (var item in scan.SectionMarks)
+            {
+                sheet.Rows.Add(new object[] { item.MarkValue, item.SourceFile, item.CheckFile, item.CheckStatus });
+            }
+
+            return sheet;
+        }
+
+        private static MinimalXlsxWriter.SheetData BuildDataLogSheet(ScanResult scan)
+        {
+            var sheet = new MinimalXlsxWriter.SheetData
+            {
+                Name = "DATALOG",
+                Headers = new[] { "File Name", "Entity Type", "Raw Content", "Extracted Result" },
+                ColumnWidths = new double[] { 30, 16, 40, 40 },
+                FreezeHeaderRow = true,
+                AutoFilter = true
+            };
+
+            foreach (var entry in scan.DataLog)
+            {
+                sheet.Rows.Add(new object[] { entry.FileName, entry.EntityType, entry.RawContent, entry.ExtractedResult });
+            }
+
+            return sheet;
         }
     }
 }

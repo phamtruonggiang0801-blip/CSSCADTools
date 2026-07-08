@@ -39,13 +39,13 @@ namespace CSSCADTools.Views
                 return;
             }
 
-            // 2. Chọn nơi lưu file báo cáo CSV
+            // 2. Chọn nơi lưu file báo cáo Excel (1 file, 4 sheet: DETAIL/REVERSE/SECTION/DATALOG)
             string reportPath = "";
             using (var saveDialog = new System.Windows.Forms.SaveFileDialog())
             {
-                saveDialog.Filter = "CSV File|*.csv";
+                saveDialog.Filter = "Excel File|*.xlsx";
                 saveDialog.Title = "Lưu báo cáo kiểm tra";
-                saveDialog.FileName = $"Report_{DateTime.Now:yyyyMMdd_HHmm}.csv";
+                saveDialog.FileName = $"Report_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
                 if (saveDialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
                 reportPath = saveDialog.FileName;
             }
@@ -60,18 +60,12 @@ namespace CSSCADTools.Views
                 await Task.Run(() =>
                 {
                     var scan = DwgDatabase.ScanFiles(dwgFiles);
-                    FileExporter.ExportReport(scan, reportPath);
-                    FileExporter.ExportDataLog(scan, reportPath);
+                    FileExporter.ExportReportExcel(scan, reportPath);
                 });
 
-                string baseName = Path.GetFileNameWithoutExtension(reportPath);
                 TxtStatus.Text = "Status: Finished!";
                 MessageBox.Show(
-                    $"Hoàn tất!\n\n" +
-                    $"1. {baseName}_DETAIL.csv\n" +
-                    $"2. {baseName}_REVERSE.csv\n" +
-                    $"3. {baseName}_SECTION.csv\n" +
-                    $"4. {baseName}_DATALOG.csv",
+                    $"Hoàn tất!\n\n{Path.GetFileName(reportPath)}\n(4 sheet: DETAIL, REVERSE, SECTION, DATALOG)",
                     "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
