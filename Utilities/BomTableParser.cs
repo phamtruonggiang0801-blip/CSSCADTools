@@ -31,6 +31,14 @@ namespace CSSCADTools.Utilities {
 
         private const int MIN_HEADER_MATCHES = 4;
 
+        // Ghi chú Material dạng tự do — KHÔNG phải bảng BOM thật, một số bản vẽ tách riêng
+        // thông tin Material của item ra 1 block SW_TABLEANNOTATION_* khác (vd "Material:
+        // Q345D or equivalent") thay vì ghi trong bảng BOM chính. "or equivalent" có thể có
+        // hoặc không — (.+?) lazy + $ ở cuối tự tìm đúng ranh giới nhờ hậu tố tùy chọn.
+        private static readonly Regex MaterialNoteRegex = new Regex(
+            @"MATERIAL\s*:\s*(.+?)(?:\s+or\s+equivalent\.?)?\s*$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         // Một số ô (thường là MATERIAL) chứa 2 vật liệu tương đương viết trên 2 dòng
         // (vd "Q355D," / "SM490B"), nhưng được lưu thành 2 MTEXT RIÊNG BIỆT ở 2 Y hơi
         // lệch nhau quanh baseline của hàng — KHÔNG gộp thành 1 entity duy nhất.
@@ -60,16 +68,21 @@ namespace CSSCADTools.Utilities {
             }
 
             if (cells.Count == 0) {
-                warning = "Không tìm thấy MTEXT nào trong block SW_TABLEANNOTATION_1";
+                warning = $"Không tìm thấy MTEXT nào trong block {btr.Name}";
                 return new List<BomItem>();
             }
 
             // Gom nhóm theo Y (dung sai ROW_TOLERANCE) -> mỗi nhóm là 1 hàng
             var rows = GroupIntoRows(cells);
 
-            // Tìm hàng header
+            // Tìm hàng header — đồng thời nhớ lại hàng "gần đúng nhất" (khớp nhiều từ khóa
+            // nhất dù chưa đủ ngưỡng) để đưa vào cảnh báo nếu không tìm ra header, giúp chẩn
+            // đoán nhanh nguyên nhân thật (thiếu từ khóa do đổi cách viết, hay hàng header bị
+            // vỡ thành nhiều mảnh do lệch Y) thay vì phải mò mẫm trong file CAD.
             List<Cell> headerRow = null;
             var columnMap = new List<(double X, string Column)>();
+            List<Cell> bestCandidateRow = null;
+            int bestMatchCount = -1;
 
             foreach (var row in rows) {
                 var matched = new List<(double X, string Column)>();
@@ -87,6 +100,11 @@ namespace CSSCADTools.Utilities {
                     }
                 }
 
+                if (matched.Count > bestMatchCount) {
+                    bestMatchCount = matched.Count;
+                    bestCandidateRow = row;
+                }
+
                 if (matched.Count >= MIN_HEADER_MATCHES) {
                     headerRow = row;
                     columnMap = matched;
@@ -95,7 +113,10 @@ namespace CSSCADTools.Utilities {
             }
 
             if (headerRow == null) {
-                warning = "Không xác định được hàng header (ITEM/QTY/...) trong block SW_TABLEANNOTATION_1";
+                string bestInfo = bestCandidateRow != null
+                    ? $" Hàng khớp nhiều từ khóa nhất chỉ đạt {bestMatchCount}/{MIN_HEADER_MATCHES}, nội dung: [{string.Join(", ", bestCandidateRow.Select(c => c.Text))}]"
+                    : "";
+                warning = $"Không xác định được hàng header (ITEM/QTY/...) trong block {btr.Name}.{bestInfo}";
                 return new List<BomItem>();
             }
 
@@ -122,6 +143,43 @@ namespace CSSCADTools.Utilities {
             }
 
             return items;
+        }
+
+        /// <summary>
+        /// Thử đọc block như 1 GHI CHÚ Material tự do (không phải bảng BOM) — quét toàn bộ
+        /// MTEXT trong block, ghép lại rồi khớp với mẫu "Material: X [or equivalent]". Dùng khi
+        /// block đã KHÔNG tìm ra được hàng header (Parse trả về 0 item) — trước khi coi đó là
+        /// lỗi thật, kiểm tra xem có phải block này vốn dĩ không phải bảng ngay từ đầu không.
+        /// </summary>
+        public static bool TryParseMaterialNote(BlockTableRecord btr, Transaction tr, out string material) {
+            var texts = new List<string>();
+
+            foreach (ObjectId entId in btr) {
+                Entity ent = tr.GetObject(entId, OpenMode.ForRead) as Entity;
+                if (ent is MText mText) {
+                    string clean = CleanMTextFormatting(mText.Contents);
+                    if (!string.IsNullOrWhiteSpace(clean)) texts.Add(clean.Trim());
+                }
+            }
+
+            return TryExtractMaterialNote(texts, out material);
+        }
+
+        /// <summary>Logic khớp mẫu thuần (không phụ thuộc AutoCAD) — tách riêng để kiểm thử độc lập
+        /// ngoài AutoCAD được (BlockTableRecord/MText chỉ tồn tại trong tiến trình AutoCAD).</summary>
+        internal static bool TryExtractMaterialNote(List<string> cellTexts, out string material) {
+            material = null;
+            if (cellTexts == null || cellTexts.Count == 0) return false;
+
+            string combined = string.Join(" ", cellTexts);
+            var match = MaterialNoteRegex.Match(combined);
+            if (!match.Success) return false;
+
+            string value = match.Groups[1].Value.Trim().TrimEnd('.', ',').Trim();
+            if (value.Length == 0) return false;
+
+            material = value;
+            return true;
         }
 
         /// <summary>

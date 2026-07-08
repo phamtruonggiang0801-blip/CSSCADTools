@@ -60,27 +60,44 @@ namespace CSSCADTools.Utilities {
                                     continue;
                                 }
 
-                                int totalItemsInFile = 0;
+                                var fileItems = new List<BomItem>();
                                 var perBlockWarnings = new List<string>();
+                                string materialNote = null;
 
                                 foreach (var btr in candidateBlocks) {
                                     var items = BomTableParser.Parse(btr, tr, out string warning);
 
                                     if (items.Count > 0) {
-                                        foreach (var item in items) {
-                                            item.SourceFile = fileName;
-                                            result.Items.Add(item);
-                                        }
-                                        totalItemsInFile += items.Count;
+                                        fileItems.AddRange(items);
+                                    } else if (BomTableParser.TryParseMaterialNote(btr, tr, out string noteMaterial)) {
+                                        // Block này KHÔNG phải bảng BOM lỗi — nó vốn dĩ chỉ là ghi
+                                        // chú Material tự do (vd "Material: Q345D or equivalent")
+                                        // tách riêng khỏi bảng BOM chính. KHÔNG ghi cảnh báo cho
+                                        // block này, vì đây là hành vi bình thường, không phải lỗi.
+                                        materialNote = noteMaterial;
                                     } else if (warning != null) {
                                         perBlockWarnings.Add($"{btr.Name}: {warning}");
                                     }
                                 }
 
+                                // Bản vẽ có đúng 1 item (đại diện cho chính bản vẽ đó) và item này
+                                // đang thiếu Material, đồng thời tìm được ghi chú Material riêng ở
+                                // 1 block khác trong CÙNG file -> điền vào. Chỉ áp dụng khi file có
+                                // ĐÚNG 1 item để tránh áp nhầm cho item không liên quan khi 1 file
+                                // có nhiều item.
+                                if (materialNote != null && fileItems.Count == 1 && string.IsNullOrWhiteSpace(fileItems[0].Material)) {
+                                    fileItems[0].Material = materialNote;
+                                }
+
+                                foreach (var item in fileItems) {
+                                    item.SourceFile = fileName;
+                                    result.Items.Add(item);
+                                }
+
                                 // Chỉ báo cảnh báo khi KHÔNG có block nào trong file cho ra dữ liệu —
                                 // vì các block phụ (ghi chú, bảng khác) không parse được là bình thường,
                                 // chỉ cần ít nhất 1 block chứa bảng BOM thật là đủ.
-                                if (totalItemsInFile == 0) {
+                                if (fileItems.Count == 0) {
                                     foreach (var w in perBlockWarnings) {
                                         result.Warnings.Add($"{fileName}: {w}");
                                     }
